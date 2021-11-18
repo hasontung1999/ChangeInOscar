@@ -1,0 +1,45 @@
+1. Source code của Oscar và cả scence-graph-benchmark (Object Detection pretrained model) đều khá
+phức tạp và tồn tại nhiều lỗi cần sửa.
+2. Những vấn đề trong source code Benchmark:
+   2.1. Không xử lí hết việc tiền xử lí dữ liệu để thu được dữ liệu phù hợp cho Oscar.
+	=> Tạo script data_pipeline/data_process.py để thực hiện việc xử lí dữ liệu từ folder
+	ảnh ban đầu cho đến khi thu được feature, label, caption cho việc huấn luyện Oscar.
+   2.2. Cần phải tạo vài biến mới trong file config sgg_configs/vgattr/vinvl_x152c4.yaml để có thể
+	xử lí vấn đề tràn bộ nhớ (OOM): 
+	2.2.1. OUTPUT_DIR: thư mục lưu trữ các file predictions.tsv.
+	2.2.2. DATA_DIR: thư mục lưu trữ các file tsv được lấy từ folder ảnh.
+	2.2.3. IMG_DIR: thư mục chứa ảnh.
+	2.2.4. CAP_DIR: file caption json.
+	2.2.5. USED_DATA_DIR: thư mục lưu trữ các file cần thiết để train Oscar.
+	2.2.6. LIMIT_DATA: giới hạn dữ liệu mà GPU và RAM có thể xử lí.
+   2.3. Tạo các biến mới trong config thì cần phải định nghĩa chúng trong maskrcnn_benchmark/config/defaults.py.
+   2.4. Để phục vụ cho việc chia nhỏ folder ảnh tránh lỗi OOM thì cần phải sửa hàm tsv_writter
+	trong maskrcnn_benchmark/structures/tsv_file_ops.py.
+   2.5. Để phục vụ cho việc chia nhỏ folder ảnh tránh lỗi OOM thì cần phải sửa hàm compute_on_dataset
+	trong maskrcnn_benchmark/engine/inference.py
+
+3. Những vấn đề trong source code Oscar:
+   3.1. Bỏ metric SPICE, thứ nhất là có nhiều metric, và thứ 2 là ko thực thi được metric này.
+	=> Thay đổi trong coco_caption/pycocoevalcap/eval.py.
+   3.2. Bỏ metric METEOR, vì để chạy cần có môi trường java, hay gây ra lỗi Broken Pipeline.
+	=> Thay đổi trong eval.py.
+   3.2. Tạo thêm Logger lưu trữ thông tin trong quá trình train của 2 tập train và valid.
+	=> File oscar/utils/my_logger.py.
+   3.3. Các vấn đề trong file oscar/run_captioning.py:
+	3.3.1. Không save checkpoint sau epoch -> đã sửa.
+	3.3.2. Logger lưu trữ quá nhiều thông tin và phức tạp -> Không load lên được.
+		 -> đã viết lại Logger mới.
+	3.3.3. Có nhiều vấn đề khi thực hiện evaluate cho cả tập valid trong quá trình training.
+		-> chưa lấy được loss và acc cho tập valid.
+
+4. Những warning:
+   4.1. UserWarning: The given NumPy... : dòng 118 oscar/run_captioning.py => Warning này vì torch 
+   yêu cầu sử dụng bản copy của array => đổi torch.Tensor(features) thành 
+   torch.Tensor(np.array(features)).
+   4.2. UserWarning: This overload of add_ is deprecated: dòng 166 trong 
+   transformer/pytorch_transformer/optimization.py =>
+   đổi exp_avg.mul_(beta1).add_(1.0 - beta1, grad) thành exp_avg.mul_(beta1).add_(grad, alpha=1.0 - beta1)
+   4.3. UserWarning: This overload of addcmul_ is deprecated: dòng 167 trong file tượng tự 4.2
+   => đổi exp_avg_sq.mul_(beta2).addcmul_(1.0 - beta2, grad, grad) thành giống 4.2
+   4.4. UserWarning: This overload of addcdiv_ is deprecated: dòng 176.
+   4.5. Giống 4.2: dòng 187
